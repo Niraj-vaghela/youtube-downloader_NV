@@ -8,7 +8,7 @@ class SafeContainer(ft.Container):
         super().__init__()
         self.content = content
         self.expand = True
-        self.padding = ft.padding.only(top=10, left=10, right=10, bottom=10) 
+        self.padding = ft.padding.only(top=45, left=10, right=10, bottom=10) 
         
 class ResponsiveGrid(ft.Column):
     """
@@ -62,7 +62,8 @@ class VideoCard(ft.Container):
         self.border_radius = 10
         self.bgcolor = ft.Colors.GREY_900
         self.padding = 10
-        self.width = 300 # Fixed width for grid compatibility
+        # self.width = 300 # Removed fixed width to allow expansion
+        # self.expand = True # REMOVED: Causes layout crash in scrollable container
         
         # Core Content
         self.main_col = ft.Column([

@@ -25,7 +25,6 @@ def main(page: ft.Page):
     # --- Tab 1: Downloader ---
     
     url_input = ft.TextField(
-        label="YouTube URL", 
         hint_text="Paste video or playlist link...", 
         expand=True,
         border_color=ft.Colors.PRIMARY,
@@ -95,62 +94,113 @@ def main(page: ft.Page):
 
         threading.Thread(target=_target, daemon=True).start()
 
-    def build_formats_list(formats):
-        # Helper to simplify list of common formats
-        # Show: Best Audio, Best Video, 1080p, 720p...
-        # We'll use our pre-parsed formats from core_downloader
+    def build_formats_list(formats, dialog_ref=None):
+        # 1. Processing Logic
+        # Audio Candidates
+        audio_candidates = [f for f in formats if f.get('type') == 'audio']
+        audio_candidates.sort(key=lambda x: (x.get('abr', 0), x.get('filesize_raw', 0)), reverse=True)
         
-        col = ft.Column(spacing=5)
+        final_audio = []
+        seen_abr = set()
         
-        # Header
-        col.controls.append(ft.Text("Available Formats:", weight=ft.FontWeight.BOLD, size=16))
+        # Add MP3 conversion options
+        final_audio.append({
+            'custom': True, 'quality': "High Quality MP3 (320kbps)", 'ext': 'mp3', 
+            'size': '~', # Unknown size before conversion
+            'id': 'audio_mp3_320', 'type': 'mp3'
+        })
+        final_audio.append({
+            'custom': True, 'quality': "Standard MP3 (192kbps)", 'ext': 'mp3', 
+            'size': audio_candidates[0].get('filesize_str', '~') if audio_candidates else 'N/A',
+            'id': 'audio_mp3_best', 'type': 'mp3'
+        })
         
-        # Audio Op
-        best_audio = next((f for f in formats if f['type'] == 'audio'), None)
-        if best_audio:
-            col.controls.append(DownloadOptionRow(
-                quality="Best Audio (MP3)",
-                size_str=best_audio.get('filesize_str', 'N/A'),
-                ext="mp3",
-                on_click=lambda _: download_wrapper('audio_mp3_best', 'mp3')
-            ))
+        # Add distinct original bitrates
+        for f in audio_candidates:
+            abr = f.get('abr', 0)
+            if abr == 0: continue
             
-        col.controls.append(ft.Divider(height=10, color=ft.Colors.TRANSPARENT))
-        
-        # Video Ops
-        # Deduplicate by resolution to avoid clustering UI
-        seen = set()
-        for f in formats:
-            if 'video' in f['type']:
-                res = f.get('resolution', 0)
-                if res == 'unknown': continue
-                
-                # Check if we already have this resolution
-                if res in seen: continue
-                seen.add(res)
-                
-                # Determine correct ID for merging if needed (handled by core_downloader logic usually)
-                # But here we just pass the ID we found.
-                # If it is 'video only', we rely on yt-dlp 'bestvideo+bestaudio' merge logic OR
-                # we force it. For now, let's assume we pass the format_id and core handles merge if needed.
-                # Actually core logic for specific ID might need 'format_id+bestaudio' manually stringified.
-                
-                fid = f['format_id']
-                if f['type'] == 'video': # Video only
-                    fid = f"{fid}+bestaudio/best"
+            # Group bitrates closely (e.g. 128 vs 130)
+            abr_group = round(abr, -1) 
+            if abr_group not in seen_abr:
+                seen_abr.add(abr_group)
+                final_audio.append(f)
+
+        # Video Candidates
+        video_candidates = [f for f in formats if 'video' in f.get('type', '')]
+        video_candidates.sort(key=lambda x: (x.get('height', 0), x.get('filesize_raw', 0)), reverse=True)
+
+        seen_heights = set()
+        final_videos = []
+        for f in video_candidates:
+            h = f.get('height', 0)
+            if h == 0: continue
+            if h not in seen_heights:
+                seen_heights.add(h)
+                final_videos.append(f)
+
+        # 2. HELPER: Generate UI Rows
+        def make_rows(items, is_video):
+            rows = []
+            for item in items:
+                if item.get('custom'):
+                    # Special Custom Rows (like MP3)
+                    rows.append(DownloadOptionRow(
+                        quality=item['quality'], size_str=item['size'], ext=item['ext'],
+                        on_click=lambda e, i=item['id']: download_wrapper(i, item['type'])
+                    ))
+                    continue
                     
-                label = f"{res}p" if isinstance(res, int) else str(res)
+                size = item.get('filesize_str', 'N/A')
+                ext = item['ext']
                 
-                col.controls.append(DownloadOptionRow(
-                    quality=f"{label} Video",
-                    size_str=f.get('filesize_str', 'N/A'),
-                    ext=f['ext'],
-                    on_click=lambda e, i=fid: download_wrapper(i, 'mp4')
-                ))
-                
-                if len(seen) >= 4: break # Limit options
-                
-        return col
+                if is_video:
+                    res = item['height']
+                    label = f"{res}p"
+                    if res >= 2160: label = f"4K ({res}p)"
+                    elif res >= 1440: label = f"2K ({res}p)"
+                    elif res >= 1080: label = f"HD ({res}p)"
+                    
+                    fid = item['format_id']
+                    if 'video' in item.get('type', ''): fid = f"{fid}+bestaudio/best"
+                    
+                    rows.append(DownloadOptionRow(
+                        quality=f"{label} Video", size_str=size, ext=ext,
+                        on_click=lambda e, i=fid: download_wrapper(i, 'mp4')
+                    ))
+                else:
+                    # Audio
+                    abr = int(item.get('abr', 0))
+                    label = f"{abr} kbps"
+                    
+                    rows.append(DownloadOptionRow(
+                        quality=f"Audio ({label})", size_str=size, ext=ext,
+                        on_click=lambda e, i=item['format_id'], x=ext: download_wrapper(i, x) # Force orig ext
+                    ))
+            return rows
+
+        # 3. Build Columns
+        audio_col = ft.Column([
+            ft.Text("Audio Formats", weight=ft.FontWeight.BOLD),
+            ft.Divider(height=5, color=ft.Colors.GREY_800),
+        ] + make_rows(final_audio, False), spacing=5, width=350)
+
+        video_col = ft.Column([
+            ft.Text("Video Formats", weight=ft.FontWeight.BOLD),
+            ft.Divider(height=5, color=ft.Colors.GREY_800),
+        ] + make_rows(final_videos, True), spacing=5, width=350)
+
+        # 4. Return Split Layout (Simple Row)
+        return ft.Container(
+            content=ft.Row(
+                [audio_col, video_col],
+                wrap=True,
+                alignment=ft.MainAxisAlignment.START,
+                vertical_alignment=ft.CrossAxisAlignment.START,
+                spacing=20
+            ),
+            padding=5
+        )
 
     def search_click(e):
         nonlocal current_video_info
@@ -226,24 +276,32 @@ def main(page: ft.Page):
     # Main Body
     body = ft.Container(content=downloader_view, expand=True)
 
-    def on_nav_change(e):
-        idx = e.control.selected_index
-        if idx == 0:
-            body.content = downloader_view
-        elif idx == 1:
+    # --- Navigation Logic ---
+    def toggle_settings(e):
+        if body.content == downloader_view:
             body.content = settings_view
+            page.appbar.title = ft.Text("Settings")
+            page.appbar.actions[0].icon = ft.Icons.CLOSE
+        else:
+            body.content = downloader_view
+            page.appbar.title = ft.Text("YouTube Downloader")
+            page.appbar.actions[0].icon = ft.Icons.SETTINGS
         page.update()
 
-    page.navigation_bar = ft.NavigationBar(
-        selected_index=0,
-        destinations=[
-            ft.NavigationBarDestination(icon=ft.Icons.DOWNLOAD, label="Downloader"),
-            ft.NavigationBarDestination(icon=ft.Icons.SETTINGS, label="Settings"),
-        ],
-        on_change=on_nav_change
+    # AppBar with Settings
+    page.appbar = ft.AppBar(
+        title=ft.Text("YouTube Downloader"),
+        center_title=True,
+        bgcolor=ft.Colors.GREY_900,
+        actions=[
+            ft.IconButton(ft.Icons.SETTINGS, on_click=toggle_settings)
+        ]
     )
+    
+    # Remove Navigation Bar
+    # page.navigation_bar = ... (Removed)
     
     page.add(SafeContainer(body, page))
 
 if __name__ == "__main__":
-    ft.app(target=main, view=ft.AppView.WEB_BROWSER)
+    ft.app(target=main, view=ft.AppView.WEB_BROWSER, port=8550)
