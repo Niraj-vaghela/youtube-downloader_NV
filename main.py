@@ -1,10 +1,14 @@
 import flet as ft
 import os
-import static_ffmpeg
 import threading
-
-# Auto-install/add ffmpeg to path
-static_ffmpeg.add_paths()
+try:
+    import static_ffmpeg
+    # Auto-install/add ffmpeg to path
+    static_ffmpeg.add_paths()
+except ImportError:
+    print("static_ffmpeg not found or failed to load. Ensure ffmpeg is in system PATH if needed.")
+except Exception as e:
+     print(f"Error loading static_ffmpeg: {e}")
 
 from core_downloader import get_video_info, download_stream
 from ui_components import SafeContainer, ResponsiveGrid, VideoCard, DownloadOptionRow, ProgressCard
