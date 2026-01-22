@@ -292,12 +292,16 @@ def main(page: ft.Page):
             page.appbar.actions[0].icon = ft.Icons.SETTINGS
         page.update()
 
+    def open_coffee(e):
+        page.launch_url("https://buymeacoffee.com/Niraj_NV")
+
     # AppBar with Settings
     page.appbar = ft.AppBar(
         title=ft.Text("YouTube Downloader"),
         center_title=True,
         bgcolor=ft.Colors.GREY_900,
         actions=[
+            ft.IconButton(ft.Icons.LOCAL_CAFE, on_click=open_coffee, tooltip="Buy me a coffee", icon_color=ft.Colors.ORANGE_300),
             ft.IconButton(ft.Icons.SETTINGS, on_click=toggle_settings)
         ]
     )
@@ -306,6 +310,23 @@ def main(page: ft.Page):
     # page.navigation_bar = ... (Removed)
     
     page.add(SafeContainer(body, page))
+
+    # Show Coffee Dialog on Load
+    def close_coffee(e):
+        coffee_dialog.open = False
+        page.update()
+
+    coffee_dialog = ft.AlertDialog(
+        title=ft.Text("Support the Developer"),
+        content=ft.Text("If you find this app useful, please consider buying me a coffee!"),
+        actions=[
+            ft.TextButton("Maybe Later", on_click=close_coffee),
+            ft.FilledButton("Support", on_click=open_coffee, icon=ft.Icons.LOCAL_CAFE, style=ft.ButtonStyle(color=ft.Colors.BLACK, bgcolor=ft.Colors.ORANGE_300))
+        ],
+    )
+    page.overlay.append(coffee_dialog)
+    coffee_dialog.open = True
+    page.update()
 
 if __name__ == "__main__":
     ft.app(target=main, view=ft.AppView.WEB_BROWSER, port=8550)
