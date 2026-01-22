@@ -40,10 +40,8 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
-          flutter-version: '3.29.0' # Explicitly setting a newer stable version or just use 'possible' if action supports it, but 'stable' channel is better. 
-          # The action subosito/flutter-action uses 'channel' for stable/beta/etc. 
-          # Let's stick to the plan: use 'stable'.
-          
+          flutter-version: '3.38.6' # Explicitly matching the version required by Flet 0.80.2
+
       - name: Diagnostics
         run: |
           echo "Java Home: $JAVA_HOME"
@@ -55,7 +53,12 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          yes | flet build apk --verbose 2>&1 | tee build.log
+          flet build apk --verbose 2>&1 | tee build.log
+
+      - name: Exfiltrate Logs to Annotations
+        if: failure()
+        run: |
+          cat build.log | while read line; do echo "::error::$line"; done
 
       - name: Upload Build Log
         if: always()
