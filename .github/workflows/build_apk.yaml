@@ -57,6 +57,11 @@ jobs:
           set -o pipefail
           flet build apk --verbose 2>&1 | tee build.log
 
+      - name: Exfiltrate Logs to Annotations
+        if: failure()
+        run: |
+          cat build.log | while read line; do echo "::error::$line"; done
+
       - name: Upload Build Log
         if: always()
         uses: actions/upload-artifact@v4
