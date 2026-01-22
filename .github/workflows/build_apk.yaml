@@ -55,12 +55,7 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          flet build apk --verbose 2>&1 | tee build.log
-
-      - name: Exfiltrate Logs to Annotations
-        if: failure()
-        run: |
-          cat build.log | while read line; do echo "::error::$line"; done
+          yes | flet build apk --verbose 2>&1 | tee build.log
 
       - name: Upload Build Log
         if: always()
