@@ -18,25 +18,30 @@ jobs:
         with:
           python-version: '3.12'
 
+      - name: Configure Android Dependencies
+        run: |
+          # Explicitly write requirements for Android (excluding static-ffmpeg)
+          echo "flet" > requirements.txt
+          echo "yt-dlp" >> requirements.txt
+          cat requirements.txt
+          
       - name: Install Dependencies
         run: |
           pip install flet
-          # Remove static-ffmpeg (desktop only) before installing
-          sed -i '/static-ffmpeg/d' requirements.txt
           pip install -r requirements.txt
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.19.0' # Use a stable version compatible with recent Flet
+          flutter-version: '3.19.0'
+
+      - name: Diagnostics
+        run: |
+          echo "Check Flutter Doctor"
+          flutter doctor -v
+          echo "Check Flet Version"
+          flet --version
 
       - name: Build APK
         run: |
-          # Flet packaging command
           flet build apk --verbose
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: youtube-downloader-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
