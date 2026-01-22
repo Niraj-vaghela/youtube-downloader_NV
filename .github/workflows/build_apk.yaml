@@ -21,6 +21,8 @@ jobs:
       - name: Install Dependencies
         run: |
           pip install flet
+          # Remove static-ffmpeg (desktop only) before installing
+          sed -i '/static-ffmpeg/d' requirements.txt
           pip install -r requirements.txt
 
       - name: Setup Flutter
