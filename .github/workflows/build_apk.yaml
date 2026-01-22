@@ -13,6 +13,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
@@ -20,13 +26,13 @@ jobs:
 
       - name: Configure Android Dependencies
         run: |
-          # Explicitly write requirements for Android (excluding static-ffmpeg)
+          # Explicitly write requirements for Android
           echo "flet" > requirements.txt
           echo "yt-dlp" >> requirements.txt
-          cat requirements.txt
           
       - name: Install Dependencies
         run: |
+          pip install cookiecutter
           pip install flet
           pip install -r requirements.txt
 
@@ -37,11 +43,26 @@ jobs:
 
       - name: Diagnostics
         run: |
-          echo "Check Flutter Doctor"
+          echo "Java Home: $JAVA_HOME"
+          java -version
           flutter doctor -v
-          echo "Check Flet Version"
           flet --version
 
       - name: Build APK
+        shell: bash
         run: |
-          flet build apk --verbose
+          set -o pipefail
+          flet build apk --verbose | tee build.log
+
+      - name: Upload Build Log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build_logs
+          path: build.log
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: youtube-downloader-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
