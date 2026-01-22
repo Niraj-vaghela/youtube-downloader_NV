@@ -13,7 +13,7 @@ except Exception as e:
 from core_downloader import get_video_info, download_stream
 from ui_components import SafeContainer, ResponsiveGrid, VideoCard, DownloadOptionRow, ProgressCard
 
-def main(page: ft.Page):
+def app_main(page: ft.Page):
     # App Configuration
     page.title = "YouTube Downloader"
     page.theme_mode = ft.ThemeMode.DARK
@@ -328,5 +328,21 @@ def main(page: ft.Page):
     coffee_dialog.open = True
     page.update()
 
+def main(page: ft.Page):
+    try:
+        app_main(page)
+    except Exception as e:
+        page.clean()
+        page.add(
+            ft.Column([
+                ft.Icon(ft.Icons.ERROR_OUTLINE, color=ft.Colors.RED, size=50),
+                ft.Text("App Startup Failed", size=24, color=ft.Colors.RED, weight=ft.FontWeight.BOLD),
+                ft.Text(f"Error: {e}", size=16),
+                ft.Text("This screen prevents the app from crashing silently."),
+            ], alignment=ft.MainAxisAlignment.CENTER)
+        )
+        page.update()
+
 if __name__ == "__main__":
-    ft.app(target=main, view=ft.AppView.WEB_BROWSER, port=8550)
+    # Ensure assets are bundled
+    ft.app(target=main, view=ft.AppView.WEB_BROWSER, port=8550, assets_dir="assets")

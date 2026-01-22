@@ -53,12 +53,37 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          flet build apk --verbose 2>&1 | tee build.log
+          flet build apk --verbose --icon assets/icon.png 2>&1 | tee build.log
 
       - name: Exfiltrate Logs to Annotations
         if: failure()
         run: |
           cat build.log | while read line; do echo "::error::$line"; done
+
+      - name: Locate and Rename APK
+        run: |
+          echo "Listing build outputs..."
+          find build -name "*.apk"
+          # Find the release APK (preferring the non-split one if multiple)
+          APK_PATH=$(find build -name "app-release.apk" | head -n 1)
+          if [ -z "$APK_PATH" ]; then
+            echo "Universal APK not found, looking for any .apk..."
+            APK_PATH=$(find build -name "*.apk" | head -n 1)
+          fi
+          
+          if [ -n "$APK_PATH" ]; then
+            echo "Found APK at $APK_PATH"
+            cp "$APK_PATH" youtube-downloader.apk
+          else
+            echo "::error::No APK found!"
+            exit 1
+          fi
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: youtube-downloader-release
+          path: youtube-downloader.apk
 
       - name: Upload Build Log
         if: always()
@@ -66,9 +91,3 @@ jobs:
         with:
           name: build_logs
           path: build.log
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: youtube-downloader-apk
-          path: "**/*.apk"
