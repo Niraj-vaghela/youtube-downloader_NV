@@ -1,19 +1,31 @@
 import flet as ft
 import os
 import threading
-try:
-    import static_ffmpeg
-    # Auto-install/add ffmpeg to path
-    static_ffmpeg.add_paths()
-except ImportError:
-    print("static_ffmpeg not found or failed to load. Ensure ffmpeg is in system PATH if needed.")
-except Exception as e:
-     print(f"Error loading static_ffmpeg: {e}")
 
-from core_downloader import get_video_info, download_stream
-from ui_components import SafeContainer, ResponsiveGrid, VideoCard, DownloadOptionRow, ProgressCard
+# NOTE: Major imports moved INSIDE app_main to prevent startup crashes on Android
 
 def app_main(page: ft.Page):
+    # --- LAZY IMPORTS START ---
+    try:
+        # Standard app imports
+        from core_downloader import get_video_info, download_stream
+        from ui_components import SafeContainer, ResponsiveGrid, VideoCard, DownloadOptionRow, ProgressCard
+        
+        # Risky binary imports
+        try:
+            import static_ffmpeg
+            # Auto-install/add ffmpeg to path
+            static_ffmpeg.add_paths()
+        except ImportError:
+            print("static_ffmpeg not found (Expected on mobile)")
+        except Exception as e:
+            print(f"static_ffmpeg error: {e}")
+            
+    except Exception as e:
+        # If imports fail, re-raise so the global handler catches it
+        raise Exception(f"dependency_import_failed: {e}")
+    # --- LAZY IMPORTS END ---
+
     # App Configuration
     page.title = "YouTube Downloader"
     page.theme_mode = ft.ThemeMode.DARK
@@ -43,7 +55,6 @@ def app_main(page: ft.Page):
             try:
                 percent = float(p) / 100
                 # Extract MB info if available
-                # yt-dlp keys: downloaded_bytes, total_bytes, total_bytes_estimate
                 downloaded = d.get('downloaded_bytes', 0)
                 total = d.get('total_bytes') or d.get('total_bytes_estimate', 0)
                 speed = d.get('_speed_str', 'N/A')
@@ -265,8 +276,6 @@ def app_main(page: ft.Page):
 
     # --- Layout Assembly ---
     
-    # --- Layout Assembly ---
-    
     downloader_view = ft.Container(content=ft.Column([
         ft.Row([url_input, ft.IconButton(ft.Icons.SEARCH, on_click=search_click, icon_color=ft.Colors.PRIMARY)]),
         status_text,
@@ -305,9 +314,6 @@ def app_main(page: ft.Page):
             ft.IconButton(ft.Icons.SETTINGS, on_click=toggle_settings)
         ]
     )
-    
-    # Remove Navigation Bar
-    # page.navigation_bar = ... (Removed)
     
     page.add(SafeContainer(body, page))
 
